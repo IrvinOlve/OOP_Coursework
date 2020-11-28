@@ -3,14 +3,19 @@ package OOP_Coursework;
 import javax.swing.*;
 import java.awt.*;
 import java.awt.event.*;
+import java.lang.reflect.Array;
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
 import java.util.*;
 import javax.swing.table.AbstractTableModel;
 import java.awt.event.ActionListener;
 
 public class GUI {
 
-    private final ArrayList<FootballClub> footballClubsList;
-    private final ArrayList<PlayedMatch> matchesPlayed;
+    private ArrayList<FootballClub> footballClubsList;
+    private ArrayList<PlayedMatch> matchesPlayedTableData = null;
+    private ArrayList<PlayedMatch> matchesPlayed;
+
 
     GUI(ArrayList<FootballClub> footballClubs, ArrayList<PlayedMatch> matchesPlayed) {
         this.footballClubsList = footballClubs;
@@ -39,101 +44,159 @@ public class GUI {
 
         JFrame frame = new JFrame("League Manager");
 
-        frame.setSize(500, 505);
+        frame.setSize(650, 500);
         frame.setLayout(new BorderLayout());
 
-        String[] columns = new String[]{"CLUB", "W", "D", "L", "S", "R", "GD", "Pts"};
-        MyTableModel tableModel = new MyTableModel(footballClubs, columns);
-        tableModel.sortByPoints();
+        // Creation of the Premier League, played matches tables and table models.
+        String[] columnsPremierLeague = new String[]{"CLUB", "W", "D", "L", "S", "R", "GD", "Pts"};
+        String[] columnsPlayedMatches = new String[]{"Date", "Home team", "Score", "Away Team"};
 
-        JTable table = new JTable(tableModel);
-        JScrollPane leagueTable = new JScrollPane(table);
+        MyTableModel premierLeagueTM = new MyTableModel(footballClubs, columnsPremierLeague);
+        MyTableModelPlayedMatches playedMatchesTM = new MyTableModelPlayedMatches(matchesPlayed, columnsPlayedMatches);
 
+        JTable premierLeagueTable = new JTable(premierLeagueTM);
+        JTable playedMatchesTable = new JTable(playedMatchesTM);
+
+        // Adjusts table's columns sizes for better visualisation.
+        setColumnWidth(premierLeagueTable, playedMatchesTable);
+
+        // Add tables in scrollable panes.
+        JScrollPane premierLeagueSP = new JScrollPane(premierLeagueTable);
+        JScrollPane playedMatchesSP = new JScrollPane(playedMatchesTable);
+
+        // Add premierLeagueTable and playedMatchesTable to a panel for better visualisation.
+        JPanel tablePanel = new JPanel(new GridLayout(2, 1));
+        tablePanel.add(premierLeagueSP);
+        tablePanel.add(playedMatchesSP);
+
+        // Creation of Premier League table sorter, based on ComboBox.
         JLabel sortByTextLabel = new JLabel("Sort by: ");
+        JComboBox<String> sortTableOptionsCB = new JComboBox<>();
 
-        JComboBox<String> cb = new JComboBox<>();
-        ItemChangeListener changeListener = new ItemChangeListener(tableModel);
+        // Creates and adds listener to ComboBox that will modify the table accordingly based on selected option.
+        ItemChangeListener changeListener = new ItemChangeListener(premierLeagueTM);
+        sortTableOptionsCB.addItemListener(changeListener);
 
+        // Add options ComboBox
+        sortTableOptionsCB.addItem("Points");
+        sortTableOptionsCB.addItem("Scored goals");
+        sortTableOptionsCB.addItem("Wins");
 
-        cb.addItemListener(changeListener);
-        cb.addItem("Points");
-        cb.addItem("Scored goals");
-        cb.addItem("Wins");
+        // Sort by Panel
+        JPanel sortByPanel = new JPanel(new GridLayout(0, 2));
+        sortByPanel.add(sortByTextLabel);
+        sortByPanel.add(sortTableOptionsCB);
 
-        JButton randomMatchButton = new JButton("Create new match");
-
-        JButton addMatchButton = new JButton("Add match");
-
+        // Creation of random matches generator.
         JLabel firstTeamNameLabel = new JLabel("First team");
         JLabel firstTeamGoalsLabel = new JLabel("0");
         JLabel secondTeamNameLabel = new JLabel("Second team");
         JLabel secondTeamGoalsLabel = new JLabel("0");
-
-        randomMatchButton.addActionListener(new ButtonActionListener(firstTeamNameLabel, firstTeamGoalsLabel, secondTeamNameLabel, secondTeamGoalsLabel, tableModel));
 
         firstTeamNameLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
         firstTeamGoalsLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
         secondTeamNameLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
         secondTeamGoalsLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
 
+        // Panels that will hold each team and score generated
         JPanel firstTeamPanel = new JPanel();
         JPanel secondTeamPanel = new JPanel();
-
         firstTeamPanel.setLayout(new BoxLayout(firstTeamPanel, BoxLayout.Y_AXIS));
         secondTeamPanel.setLayout(new BoxLayout(secondTeamPanel, BoxLayout.Y_AXIS));
 
+        // Add team names and scores labels to their panel.
         firstTeamPanel.add(firstTeamNameLabel);
         firstTeamPanel.add(firstTeamGoalsLabel);
-
         secondTeamPanel.add(secondTeamNameLabel);
         secondTeamPanel.add(secondTeamGoalsLabel);
 
+        // Create a new panel that will hold both previously created panels (the ones that each hold team's name and scores)
         JPanel matchStats = new JPanel(new GridLayout(0, 2));
-
         matchStats.add(firstTeamPanel);
         matchStats.add(secondTeamPanel);
 
-        JPanel randomMatchPanel = new JPanel(new BorderLayout());
-        randomMatchPanel.add(matchStats, BorderLayout.NORTH);
-        randomMatchPanel.add(randomMatchButton, BorderLayout.CENTER);
-
-        JPanel bottomPanel = new JPanel(new BorderLayout());
-        bottomPanel.add(randomMatchPanel, BorderLayout.EAST);
-        // Sort by Panel
+        // Create button and add listener that will modify the each JLabel accordingly to the random match generated.
+        JButton randomMatchButton = new JButton("Generate match");
+        randomMatchButton.addActionListener(new ButtonActionListener(firstTeamNameLabel, firstTeamGoalsLabel, secondTeamNameLabel, secondTeamGoalsLabel, premierLeagueTM));
 
 
-        JPanel sortByPanel = new JPanel(new GridLayout(0, 2));
-        sortByPanel.add(sortByTextLabel);
-        sortByPanel.add(cb);
+        JLabel searchMatchLabel = new JLabel("    Enter date (dd/mm/yyyy): ");
+        JTextField textField = new JTextField("");
+
+        JButton searchMatchButton = new JButton("Search");
+
+        JButton showMatches = new JButton("Show all matches");
+        JLabel messageStatusLabel = new JLabel("");
+
+        showMatches.addActionListener(new ButtonActionListenerPlayedMatches(messageStatusLabel, playedMatchesTable, matchesPlayed));
+
+
+
+        searchMatchButton.addActionListener(new MatchPlayedButtonListener(messageStatusLabel, textField, playedMatchesTable, searchMatchButton, matchesPlayedTableData));
+
+        JPanel randomMatchPanel = new JPanel(new GridLayout(0, 1));
+
+        JPanel searchMatchContainer = new JPanel(new GridLayout(0, 2));
+
+        searchMatchContainer.add(textField);
+        searchMatchContainer.add(searchMatchButton);
+
+        randomMatchPanel.add(matchStats);
+        randomMatchPanel.add(randomMatchButton);
+        randomMatchPanel.add(searchMatchLabel);
+        randomMatchPanel.add(searchMatchContainer);
+        randomMatchPanel.add(showMatches);
+        randomMatchPanel.add(messageStatusLabel);
+
+        JPanel bottomPanel = new JPanel();
+        bottomPanel.add(randomMatchPanel);
+
+
 
         // Panel that will hold everything!
 
         JPanel topPanel = new JPanel(new BorderLayout());
         topPanel.add(sortByPanel, BorderLayout.EAST);
+        topPanel.add(bottomPanel, BorderLayout.WEST);
 
         JPanel mainPanel = new JPanel();
         mainPanel.setLayout(new BorderLayout());
         mainPanel.add(topPanel, BorderLayout.NORTH);
-        mainPanel.add(leagueTable, BorderLayout.CENTER);
-        mainPanel.add(bottomPanel, BorderLayout.SOUTH);
+        mainPanel.add(tablePanel, BorderLayout.EAST);
+        mainPanel.add(bottomPanel, BorderLayout.WEST);
 
 
         frame.setContentPane(mainPanel);
         frame.setVisible(true);
     }
 
-    public void randomMatch() {
-
+    private ArrayList<PlayedMatch> findFootballMatch(String matchDate) {
+        ArrayList<PlayedMatch> foundMatches = new ArrayList<>();
+        for (PlayedMatch match : matchesPlayed) {
+            if (match.getDate().equalsIgnoreCase(matchDate)) {
+                foundMatches.add(match);
+            }
+        }
+        return foundMatches;
     }
 
+    private void setColumnWidth(JTable clubs, JTable playedMatches) {
+//        playedMatches.getColumnModel().getColumn(2).setPreferredWidth(5);
+        clubs.getColumnModel().getColumn(0).setPreferredWidth(50);
+        for (int i = 1; i <= 7; i++) {
+            clubs.getColumnModel().getColumn(i).setPreferredWidth(7);
 
-    class MyTableModel extends AbstractTableModel {
+        }
+    }
+
+    private class MyTableModel extends AbstractTableModel {
         private final ArrayList<FootballClub> footballClubList;
         private final String[] columns;
 
         MyTableModel(ArrayList<FootballClub> data, String[] columns) {
             this.footballClubList = data;
             this.columns = columns;
+            sortByPoints();
         }
 
         public String getColumnName(int col) {
@@ -152,6 +215,7 @@ public class GUI {
 
         @Override
         public Object getValueAt(int row, int column) {
+
             switch (column) {
                 case 0:   // col 1
                     return footballClubList.get(row).getName();
@@ -176,22 +240,113 @@ public class GUI {
 
         public void sortByPoints() {
             footballClubList.sort(Comparator.comparingInt(FootballClub::getPoints).reversed());
-            fireTableDataChanged();
+            this.fireTableDataChanged();
         }
 
         public void sortByWins() {
             footballClubList.sort(Comparator.comparingInt(FootballClub::getWins).reversed());
-            fireTableDataChanged();
+            this.fireTableDataChanged();
         }
 
         public void sortByScoredGoals() {
             footballClubList.sort(Comparator.comparingInt(FootballClub::getScoredGoals).reversed());
-            fireTableDataChanged();
+            this.fireTableDataChanged();
         }
     }
 
-    class ItemChangeListener implements ItemListener {
+    private class MyTableModelPlayedMatches extends AbstractTableModel {
+        private final ArrayList<PlayedMatch> matchesPlayed;
+        private final String[] columns;
 
+        MyTableModelPlayedMatches(ArrayList<PlayedMatch> data, String[] columns) {
+            this.matchesPlayed = data;
+            this.columns = columns;
+        }
+
+        public String getColumnName(int col) {
+            return columns[col];
+        }
+
+        @Override
+        public int getRowCount() {
+            return matchesPlayed.size();
+        }
+
+        @Override
+        public int getColumnCount() {
+            return columns.length;
+        }
+
+        @Override
+        public Object getValueAt(int row, int column) {
+
+            switch (column) {
+                case 0:   // col 1
+                    return matchesPlayed.get(row).getDate();
+                case 1:   // col 2
+                    return matchesPlayed.get(row).getTeam_A_name();
+                case 2:   // col 3
+                    return matchesPlayed.get(row).getTeam_A_goals() + " - " + matchesPlayed.get(row).getTeam_B_goals();
+                case 3:   // col 4
+                    return matchesPlayed.get(row).getTeam_B_name();
+                default:
+                    return "";
+            }
+        }
+
+        public void sortByDate() {
+            matchesPlayed.sort(Comparator.comparing(o ->
+                    {
+                        try {
+                            return new SimpleDateFormat("dd/MM/yyyy").parse(o.getDate());
+                        } catch (ParseException e) {
+                            e.printStackTrace();
+                        }
+                        return null;
+                    }
+            ));
+            this.fireTableDataChanged();
+        }
+
+
+    }
+
+    private class MatchPlayedButtonListener implements ActionListener {
+        JLabel messageStatusLabel;
+        JTextField textField;
+        JTable table;
+//        JButton button;
+        ArrayList<PlayedMatch> playedMatches;
+        ArrayList<PlayedMatch> foundPlayedMatches;
+
+        MatchPlayedButtonListener(JLabel messageStatusLabel, JTextField textField, JTable table, JButton button, ArrayList<PlayedMatch> playedMatches) {
+            this.messageStatusLabel = messageStatusLabel;
+            this.textField = textField;
+            this.table = table;
+//            this.button = button;
+            this.playedMatches = playedMatches;
+        }
+
+        @Override
+        public void actionPerformed(ActionEvent ae) {
+            String matchDate = textField.getText();
+
+            // find matches based on given date
+            foundPlayedMatches = findFootballMatch(matchDate);
+
+            String[] columnsPlayedMatches = new String[]{"Date", "Home team", "Score", "Away Team"};
+
+            // update table's model to new one with matches found
+            if (foundPlayedMatches.size() >= 1) {
+                table.setModel(new MyTableModelPlayedMatches(foundPlayedMatches, columnsPlayedMatches));
+            } else {
+                messageStatusLabel.setText("Not matches found");
+            }
+        }
+
+    }
+
+    private class ItemChangeListener implements ItemListener {
         MyTableModel tableModel;
 
         ItemChangeListener(MyTableModel tableModel) {
@@ -219,7 +374,7 @@ public class GUI {
         }
     }
 
-    class ButtonActionListener implements ActionListener {
+    private class ButtonActionListener implements ActionListener {
 
         FootballClub firstTeam = null;
         FootballClub secondTeam = null;
@@ -276,10 +431,12 @@ public class GUI {
 
             secondTeamTemp = footballClubsList.get(randomTeam);
 
+
             while (firstTeam == secondTeamTemp) {
                 randomTeam = randomNumber(clubsListSize);
                 secondTeamTemp = footballClubsList.get(randomTeam);
             }
+
 
             secondTeam = secondTeamTemp;
             secondTeamGoals = randomGoals;
@@ -289,6 +446,14 @@ public class GUI {
 
             randomDay = randomNumber(daysRange) + 1 + "";
             randomMonth = randomNumber(monthRange) + 1 + "";
+
+            if (randomDay.length() == 1) {
+                randomDay = "0" + randomDay;
+            }
+
+            if (randomMonth.length() == 1) {
+                randomMonth = "0" + randomMonth;
+            }
 
             datePlayed = randomDay.concat("/").concat(randomMonth).concat("/").concat("2020");
 
@@ -322,6 +487,28 @@ public class GUI {
                 Team_2.setWins(1);
                 Team_1.setDefeats(1);
             }
+        }
+    }
+
+    private class ButtonActionListenerPlayedMatches implements ActionListener {
+        JLabel messageStatusLabel;
+        JTable table;
+        ArrayList<PlayedMatch> matchesPlayed;
+
+        ButtonActionListenerPlayedMatches(JLabel messageStatusLabel, JTable table, ArrayList<PlayedMatch> matchesPlayed) {
+            this.messageStatusLabel = messageStatusLabel;
+            this.table = table;
+            this.matchesPlayed = matchesPlayed;
+        }
+
+        @Override
+        public void actionPerformed(ActionEvent e) {
+            String[] columnsPlayedMatches = new String[]{"Date", "Home team", "Score", "Away Team"};
+            MyTableModelPlayedMatches tableModel = new MyTableModelPlayedMatches(matchesPlayed, columnsPlayedMatches);
+            tableModel.sortByDate();
+            table.setModel(tableModel);
+            tableModel.fireTableDataChanged();
+            messageStatusLabel.setText("");
         }
     }
 }
