@@ -3,7 +3,6 @@ package OOP_Coursework;
 import javax.swing.*;
 import java.awt.*;
 import java.awt.event.*;
-import java.lang.reflect.Array;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.*;
@@ -48,17 +47,16 @@ public class GUI {
         frame.setLayout(new BorderLayout());
 
         // Creation of the Premier League, played matches tables and table models.
-        String[] columnsPremierLeague = new String[]{"CLUB", "W", "D", "L", "S", "R", "GD", "Pts"};
-        String[] columnsPlayedMatches = new String[]{"Date", "Home team", "Score", "Away Team"};
 
-        MyTableModel premierLeagueTM = new MyTableModel(footballClubs, columnsPremierLeague);
-        MyTableModelPlayedMatches playedMatchesTM = new MyTableModelPlayedMatches(matchesPlayed, columnsPlayedMatches);
+
+        PremierLeagueTableModel premierLeagueTM = new PremierLeagueTableModel(footballClubs);
+        PlayedMatchesTableModel playedMatchesTM = new PlayedMatchesTableModel(matchesPlayed);
 
         JTable premierLeagueTable = new JTable(premierLeagueTM);
         JTable playedMatchesTable = new JTable(playedMatchesTM);
 
         // Adjusts table's columns sizes for better visualisation.
-        setColumnWidth(premierLeagueTable, playedMatchesTable);
+        setColumnWidth(premierLeagueTable);
 
         // Add tables in scrollable panes.
         JScrollPane premierLeagueSP = new JScrollPane(premierLeagueTable);
@@ -74,7 +72,7 @@ public class GUI {
         JComboBox<String> sortTableOptionsCB = new JComboBox<>();
 
         // Creates and adds listener to ComboBox that will modify the table accordingly based on selected option.
-        ItemChangeListener changeListener = new ItemChangeListener(premierLeagueTM);
+        OptionComboBoxListener changeListener = new OptionComboBoxListener(premierLeagueTM);
         sortTableOptionsCB.addItemListener(changeListener);
 
         // Add options ComboBox
@@ -117,7 +115,7 @@ public class GUI {
 
         // Create button and add listener that will modify the each JLabel accordingly to the random match generated.
         JButton randomMatchButton = new JButton("Generate match");
-        randomMatchButton.addActionListener(new ButtonActionListener(firstTeamNameLabel, firstTeamGoalsLabel, secondTeamNameLabel, secondTeamGoalsLabel, premierLeagueTM));
+        randomMatchButton.addActionListener(new GenerateMatchButtonListener(firstTeamNameLabel, firstTeamGoalsLabel, secondTeamNameLabel, secondTeamGoalsLabel, premierLeagueTM));
 
 
         JLabel searchMatchLabel = new JLabel("    Enter date (dd/mm/yyyy): ");
@@ -125,14 +123,12 @@ public class GUI {
 
         JButton searchMatchButton = new JButton("Search");
 
-        JButton showMatches = new JButton("Show all matches");
+        JButton showAllMatchesButton = new JButton("Show all matches");
         JLabel messageStatusLabel = new JLabel("");
 
-        showMatches.addActionListener(new ButtonActionListenerPlayedMatches(messageStatusLabel, playedMatchesTable, matchesPlayed));
+        showAllMatchesButton.addActionListener(new ShowAllMatchesButtonListener(textField, messageStatusLabel, playedMatchesTable, matchesPlayed));
 
-
-
-        searchMatchButton.addActionListener(new MatchPlayedButtonListener(messageStatusLabel, textField, playedMatchesTable, searchMatchButton, matchesPlayedTableData));
+        searchMatchButton.addActionListener(new SearchMatchButtonListener(messageStatusLabel, textField, playedMatchesTable));
 
         JPanel randomMatchPanel = new JPanel(new GridLayout(0, 1));
 
@@ -145,13 +141,11 @@ public class GUI {
         randomMatchPanel.add(randomMatchButton);
         randomMatchPanel.add(searchMatchLabel);
         randomMatchPanel.add(searchMatchContainer);
-        randomMatchPanel.add(showMatches);
+        randomMatchPanel.add(showAllMatchesButton);
         randomMatchPanel.add(messageStatusLabel);
 
         JPanel bottomPanel = new JPanel();
         bottomPanel.add(randomMatchPanel);
-
-
 
         // Panel that will hold everything!
 
@@ -170,32 +164,20 @@ public class GUI {
         frame.setVisible(true);
     }
 
-    private ArrayList<PlayedMatch> findFootballMatch(String matchDate) {
-        ArrayList<PlayedMatch> foundMatches = new ArrayList<>();
-        for (PlayedMatch match : matchesPlayed) {
-            if (match.getDate().equalsIgnoreCase(matchDate)) {
-                foundMatches.add(match);
-            }
-        }
-        return foundMatches;
-    }
-
-    private void setColumnWidth(JTable clubs, JTable playedMatches) {
-//        playedMatches.getColumnModel().getColumn(2).setPreferredWidth(5);
+    private void setColumnWidth(JTable clubs) {
         clubs.getColumnModel().getColumn(0).setPreferredWidth(50);
         for (int i = 1; i <= 7; i++) {
             clubs.getColumnModel().getColumn(i).setPreferredWidth(7);
-
         }
     }
 
-    private class MyTableModel extends AbstractTableModel {
-        private final ArrayList<FootballClub> footballClubList;
-        private final String[] columns;
+    private class PremierLeagueTableModel extends AbstractTableModel {
+        private ArrayList<FootballClub> footballClubList;
+        private String[] columns;
 
-        MyTableModel(ArrayList<FootballClub> data, String[] columns) {
+        PremierLeagueTableModel(ArrayList<FootballClub> data) {
             this.footballClubList = data;
-            this.columns = columns;
+            this.columns = new String[]{"CLUB", "W", "D", "L", "S", "R", "GD", "Pts"};
             sortByPoints();
         }
 
@@ -254,13 +236,13 @@ public class GUI {
         }
     }
 
-    private class MyTableModelPlayedMatches extends AbstractTableModel {
-        private final ArrayList<PlayedMatch> matchesPlayed;
-        private final String[] columns;
+    private class PlayedMatchesTableModel extends AbstractTableModel {
+        private ArrayList<PlayedMatch> matchesPlayed;
+        private String[] columns;
 
-        MyTableModelPlayedMatches(ArrayList<PlayedMatch> data, String[] columns) {
+        PlayedMatchesTableModel(ArrayList<PlayedMatch> data) {
             this.matchesPlayed = data;
-            this.columns = columns;
+            this.columns = new String[]{"Date", "Home team", "Score", "Away Team"};
         }
 
         public String getColumnName(int col) {
@@ -279,7 +261,6 @@ public class GUI {
 
         @Override
         public Object getValueAt(int row, int column) {
-
             switch (column) {
                 case 0:   // col 1
                     return matchesPlayed.get(row).getDate();
@@ -307,74 +288,76 @@ public class GUI {
             ));
             this.fireTableDataChanged();
         }
-
-
     }
 
-    private class MatchPlayedButtonListener implements ActionListener {
+    private class SearchMatchButtonListener implements ActionListener {
         JLabel messageStatusLabel;
         JTextField textField;
         JTable table;
-//        JButton button;
-        ArrayList<PlayedMatch> playedMatches;
-        ArrayList<PlayedMatch> foundPlayedMatches;
 
-        MatchPlayedButtonListener(JLabel messageStatusLabel, JTextField textField, JTable table, JButton button, ArrayList<PlayedMatch> playedMatches) {
+        SearchMatchButtonListener(JLabel messageStatusLabel, JTextField textField, JTable table) {
             this.messageStatusLabel = messageStatusLabel;
             this.textField = textField;
             this.table = table;
-//            this.button = button;
-            this.playedMatches = playedMatches;
         }
 
         @Override
         public void actionPerformed(ActionEvent ae) {
+
+            // get date from text field
             String matchDate = textField.getText();
 
-            // find matches based on given date
-            foundPlayedMatches = findFootballMatch(matchDate);
+            // find matches from given date and store them in a list
+            ArrayList<PlayedMatch> foundPlayedMatches = findFootballMatch(matchDate);
 
-            String[] columnsPlayedMatches = new String[]{"Date", "Home team", "Score", "Away Team"};
+            // create new table model with only the found matches
+            PlayedMatchesTableModel playedMatchesTM = new PlayedMatchesTableModel(foundPlayedMatches);
 
-            // update table's model to new one with matches found
-            if (foundPlayedMatches.size() >= 1) {
-                table.setModel(new MyTableModelPlayedMatches(foundPlayedMatches, columnsPlayedMatches));
+            // update table's model if any match was found
+            if (foundPlayedMatches.isEmpty()) {
+                messageStatusLabel.setText("Not matches found!");
             } else {
-                messageStatusLabel.setText("Not matches found");
+                table.setModel(playedMatchesTM);
             }
         }
 
+        private ArrayList<PlayedMatch> findFootballMatch(String matchDate) {
+            ArrayList<PlayedMatch> foundMatches = new ArrayList<>();
+            for (PlayedMatch match : matchesPlayed) {
+                if (match.getDate().equalsIgnoreCase(matchDate)) {
+                    foundMatches.add(match);
+                }
+            }
+            return foundMatches;
+        }
     }
 
-    private class ItemChangeListener implements ItemListener {
-        MyTableModel tableModel;
+    private class ShowAllMatchesButtonListener implements ActionListener {
+        JLabel messageStatusLabel;
+        JTextField textField;
+        JTable table;
+        ArrayList<PlayedMatch> matchesPlayed;
 
-        ItemChangeListener(MyTableModel tableModel) {
-            this.tableModel = tableModel;
+        ShowAllMatchesButtonListener(JTextField textField, JLabel messageStatusLabel, JTable table, ArrayList<PlayedMatch> matchesPlayed) {
+            this.messageStatusLabel = messageStatusLabel;
+            this.textField = textField;
+            this.table = table;
+            this.matchesPlayed = matchesPlayed;
+
         }
 
         @Override
-        public void itemStateChanged(ItemEvent event) {
-
-            String selectedOption = event.getItem().toString();
-
-            if (event.getStateChange() == ItemEvent.SELECTED) {
-                switch (selectedOption.toLowerCase()) {
-                    case ("wins"):
-                        tableModel.sortByWins();
-                        break;
-                    case ("scored goals"):
-                        tableModel.sortByScoredGoals();
-                        break;
-                    case ("points"):
-                        tableModel.sortByPoints();
-                        break;
-                }
-            }
+        public void actionPerformed(ActionEvent e) {
+            PlayedMatchesTableModel tableModel = new PlayedMatchesTableModel(matchesPlayed);
+            tableModel.sortByDate();
+            table.setModel(tableModel);
+            tableModel.fireTableDataChanged();
+            textField.setText("");
+            messageStatusLabel.setText("");
         }
     }
 
-    private class ButtonActionListener implements ActionListener {
+    private class GenerateMatchButtonListener implements ActionListener {
 
         FootballClub firstTeam = null;
         FootballClub secondTeam = null;
@@ -386,9 +369,9 @@ public class GUI {
         JLabel firstTeamGoalsLabel;
         JLabel secondTeamNameLabel;
         JLabel secondTeamGoalsLabel;
-        MyTableModel tableModel;
+        PremierLeagueTableModel tableModel;
 
-        ButtonActionListener(JLabel firstTeamNameLabel, JLabel firstTeamGoalsLabel, JLabel secondTeamNameLabel, JLabel secondTeamGoalsLabel, MyTableModel tableModel) {
+        GenerateMatchButtonListener(JLabel firstTeamNameLabel, JLabel firstTeamGoalsLabel, JLabel secondTeamNameLabel, JLabel secondTeamGoalsLabel, PremierLeagueTableModel tableModel) {
             this.tableModel = tableModel;
             this.firstTeamNameLabel = firstTeamNameLabel;
             this.firstTeamGoalsLabel = firstTeamGoalsLabel;
@@ -411,7 +394,7 @@ public class GUI {
         }
 
         private void generateMatch() {
-            FootballClub secondTeamTemp;
+            PlayedMatch playedMatch;
             String randomDay;
             String randomMonth;
             int randomGoals;
@@ -429,17 +412,13 @@ public class GUI {
             randomGoals = randomNumber(goalsRange);
             randomTeam = randomNumber(clubsListSize);
 
-            secondTeamTemp = footballClubsList.get(randomTeam);
-
-
-            while (firstTeam == secondTeamTemp) {
-                randomTeam = randomNumber(clubsListSize);
-                secondTeamTemp = footballClubsList.get(randomTeam);
-            }
-
-
-            secondTeam = secondTeamTemp;
+            secondTeam = footballClubsList.get(randomTeam);
             secondTeamGoals = randomGoals;
+
+            while (firstTeam == secondTeam) {
+                randomTeam = randomNumber(clubsListSize);
+                secondTeam = footballClubsList.get(randomTeam);
+            }
 
             int daysRange = 27;
             int monthRange = 11;
@@ -450,14 +429,13 @@ public class GUI {
             if (randomDay.length() == 1) {
                 randomDay = "0" + randomDay;
             }
-
             if (randomMonth.length() == 1) {
                 randomMonth = "0" + randomMonth;
             }
 
             datePlayed = randomDay.concat("/").concat(randomMonth).concat("/").concat("2020");
 
-            PlayedMatch playedMatch = new PlayedMatch(datePlayed, firstTeam, firstTeamGoals, secondTeam, secondTeamGoals);
+            playedMatch = new PlayedMatch(datePlayed, firstTeam, firstTeamGoals, secondTeam, secondTeamGoals);
 
             matchesPlayed.add(playedMatch);
             setStatistics(firstTeam, firstTeamGoals, secondTeam, secondTeamGoals);
@@ -490,25 +468,34 @@ public class GUI {
         }
     }
 
-    private class ButtonActionListenerPlayedMatches implements ActionListener {
-        JLabel messageStatusLabel;
-        JTable table;
-        ArrayList<PlayedMatch> matchesPlayed;
+    private class OptionComboBoxListener implements ItemListener {
+        PremierLeagueTableModel tableModel;
 
-        ButtonActionListenerPlayedMatches(JLabel messageStatusLabel, JTable table, ArrayList<PlayedMatch> matchesPlayed) {
-            this.messageStatusLabel = messageStatusLabel;
-            this.table = table;
-            this.matchesPlayed = matchesPlayed;
+        OptionComboBoxListener(PremierLeagueTableModel tableModel) {
+            this.tableModel = tableModel;
         }
 
         @Override
-        public void actionPerformed(ActionEvent e) {
-            String[] columnsPlayedMatches = new String[]{"Date", "Home team", "Score", "Away Team"};
-            MyTableModelPlayedMatches tableModel = new MyTableModelPlayedMatches(matchesPlayed, columnsPlayedMatches);
-            tableModel.sortByDate();
-            table.setModel(tableModel);
-            tableModel.fireTableDataChanged();
-            messageStatusLabel.setText("");
+        public void itemStateChanged(ItemEvent event) {
+
+            String selectedOption = event.getItem().toString();
+
+            if (event.getStateChange() == ItemEvent.SELECTED) {
+                switch (selectedOption.toLowerCase()) {
+                    case ("wins"):
+                        tableModel.sortByWins();
+                        break;
+                    case ("scored goals"):
+                        tableModel.sortByScoredGoals();
+                        break;
+                    case ("points"):
+                        tableModel.sortByPoints();
+                        break;
+                }
+            }
         }
     }
+
+
+
 }
