@@ -1,7 +1,7 @@
 package OOP_Coursework;
 
 public class FootballClub extends SportsClub {
-
+    private boolean relegated;
     private int wins = 0;
     private int draws = 0;
     private int defeats = 0;
@@ -9,10 +9,6 @@ public class FootballClub extends SportsClub {
     private int scoredGoals = 0;
     private int points = 0;
     private int playedMatches = 0;
-
-    FootballClub(String name) {
-        setName(name);
-    }
 
     FootballClub(String name, String location) {
         setName(name);
